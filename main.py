@@ -52,25 +52,25 @@ async def main():
     recent_users = []
     messages = set()
 
-    for user in all_participants:
-        status = user.status
-        if isinstance(status, UserStatusOnline):
-            last_seen = now
-            status_str = 'Online'
-        elif isinstance(status, UserStatusOffline):
-            last_seen = status.was_online
-            status_str = f'Offline - {last_seen.strftime("%d-%m-%Y")}'
-        else:
-            continue
+    # for user in all_participants:
+    #     status = user.status
+    #     if isinstance(status, UserStatusOnline):
+    #         last_seen = now
+    #         status_str = 'Online'
+    #     elif isinstance(status, UserStatusOffline):
+    #         last_seen = status.was_online
+    #         status_str = f'Offline - {last_seen.strftime("%d-%m-%Y")}'
+    #     else:
+    #         continue
 
-        if (now - last_seen) <= timedelta(days=day_target) and user.username:
-            name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-            recent_users.append({
-                'ID': user.username,
-                'Tên': name,
-                'Trạng thái hoạt động': status_str
-            })
-            messages.add(f"[{name}](t.me/{user.username})")
+    #     if (now - last_seen) <= timedelta(days=day_target) and user.username:
+    #         name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    #         recent_users.append({
+    #             'ID': user.username,
+    #             'Tên': name,
+    #             'Trạng thái hoạt động': status_str
+    #         })
+    #         messages.add(f"[{name}](t.me/{user.username})")
 
     messages_his = await client.get_messages(target_group, limit=messeges_limit)
 
@@ -113,7 +113,7 @@ async def main():
     df_all.to_csv(f"{name_group}.csv", index=False)
 
     print("Đã gửi tin nhắn")
-    print(f"Đã lưu {len(recent_users)} người dùng hoạt động gần đây vào {name_group}.csv")
+    print(f"Đã lưu {len(messages)} người dùng hoạt động gần đây vào {name_group}.csv")
     print("Nhấn Enter để thoát")
     if input() == "":
         exit()
