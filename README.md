@@ -20,9 +20,6 @@
 pip install telethon python-telegram-bot pandas
 ```
 
-## Cấu hình
-Trước khi chạy chương trình, bạn cần cập nhật file `config.py` với các thông tin sau cá nhân
-
 ## Cách sử dụng
 **Vui lòng liên hệ trong thông tin liên hệ**
 
