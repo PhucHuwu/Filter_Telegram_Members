@@ -8,7 +8,41 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QMessageBox, QFileDialog, QPlainTextEdit)
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QThread
 
-from auth import AuthDialog, StdoutRedirector
+from auth import StdoutRedirector
+
+
+class ComboBoxWithHistory(QComboBox):
+
+    def __init__(self, parent=None, max_history=10):
+        super().__init__(parent)
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.max_history = max_history
+
+    def add_to_history(self, text):
+        if not text:
+            return
+
+        idx = self.findText(text)
+        if idx >= 0:
+            self.removeItem(idx)
+
+        self.insertItem(0, text)
+        self.setCurrentIndex(0)
+
+        while self.count() > self.max_history:
+            self.removeItem(self.count() - 1)
+
+    def get_history(self):
+        return [self.itemText(i) for i in range(self.count())]
+
+    def set_history(self, items):
+        self.clear()
+        for item in items:
+            if item:
+                self.addItem(item)
+        if self.count() > 0:
+            self.setCurrentIndex(0)
 
 
 class TelegramWorker(QThread):
@@ -24,7 +58,7 @@ class TelegramScraperUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Lọc mem Telegram")
-        self.setGeometry(100, 100, 600, 600)
+        self.setGeometry(100, 100, 600, 650)
 
         self.config = {
             'bot_token': '',
@@ -33,6 +67,7 @@ class TelegramScraperUI(QMainWindow):
             'chat_id': '',
             'phone_number': '',
             'group_link': '',
+            'group_link_history': [],
             'messages_limit': 1000,
             'member_limit': 1000,
             'day_target': 0,
@@ -48,7 +83,11 @@ class TelegramScraperUI(QMainWindow):
         self.setup_ui()
 
         self.worker_thread = None
-        self.auth_dialog = None
+
+        self.waiting_for_phone = False
+        self.waiting_for_code = False
+
+        self.is_scraping = False
 
     def setup_ui(self):
         main_widget = QWidget()
@@ -60,17 +99,19 @@ class TelegramScraperUI(QMainWindow):
 
         self.create_filters_group(main_layout)
 
+        self.create_auth_controls_group(main_layout)
+
         self.create_console_group(main_layout)
 
         action_layout = QHBoxLayout()
 
-        save_button = QPushButton("Lưu cấu hình")
-        save_button.clicked.connect(self.save_config)
-        action_layout.addWidget(save_button)
+        self.save_button = QPushButton("Lưu cấu hình")
+        self.save_button.clicked.connect(self.save_config)
+        action_layout.addWidget(self.save_button)
 
-        run_button = QPushButton("Bắt đầu lọc")
-        run_button.clicked.connect(self.run_scraper)
-        action_layout.addWidget(run_button)
+        self.run_button = QPushButton("Bắt đầu lọc")
+        self.run_button.clicked.connect(self.run_scraper)
+        action_layout.addWidget(self.run_button)
 
         main_layout.addLayout(action_layout)
 
@@ -78,7 +119,7 @@ class TelegramScraperUI(QMainWindow):
         self.setCentralWidget(main_widget)
 
         self.stdout_redirector = StdoutRedirector()
-        self.stdout_redirector.text_written.connect(self.append_to_console)
+        self.stdout_redirector.text_written.connect(self.handle_stdout)
         sys.stdout = self.stdout_redirector
 
     def create_api_credentials_group(self, parent_layout):
@@ -89,7 +130,7 @@ class TelegramScraperUI(QMainWindow):
         bot_layout.addWidget(QLabel("Bot Token:"))
         self.bot_token_input = QLineEdit(self.config['bot_token'])
         bot_layout.addWidget(self.bot_token_input)
-        self.save_bot_token_cb = QCheckBox("Save")
+        self.save_bot_token_cb = QCheckBox("Lưu")
         self.save_bot_token_cb.setChecked(bool(self.config['bot_token']))
         bot_layout.addWidget(self.save_bot_token_cb)
         layout.addLayout(bot_layout)
@@ -98,7 +139,7 @@ class TelegramScraperUI(QMainWindow):
         api_hash_layout.addWidget(QLabel("API Hash:"))
         self.api_hash_input = QLineEdit(self.config['api_hash'])
         api_hash_layout.addWidget(self.api_hash_input)
-        self.save_api_hash_cb = QCheckBox("Save")
+        self.save_api_hash_cb = QCheckBox("Lưu")
         self.save_api_hash_cb.setChecked(bool(self.config['api_hash']))
         api_hash_layout.addWidget(self.save_api_hash_cb)
         layout.addLayout(api_hash_layout)
@@ -107,7 +148,7 @@ class TelegramScraperUI(QMainWindow):
         api_id_layout.addWidget(QLabel("API ID:"))
         self.api_id_input = QLineEdit(self.config['api_id'])
         api_id_layout.addWidget(self.api_id_input)
-        self.save_api_id_cb = QCheckBox("Save")
+        self.save_api_id_cb = QCheckBox("Lưu")
         self.save_api_id_cb.setChecked(bool(self.config['api_id']))
         api_id_layout.addWidget(self.save_api_id_cb)
         layout.addLayout(api_id_layout)
@@ -116,7 +157,7 @@ class TelegramScraperUI(QMainWindow):
         chat_id_layout.addWidget(QLabel("Chat ID:"))
         self.chat_id_input = QLineEdit(self.config['chat_id'])
         chat_id_layout.addWidget(self.chat_id_input)
-        self.save_chat_id_cb = QCheckBox("Save")
+        self.save_chat_id_cb = QCheckBox("Lưu")
         self.save_chat_id_cb.setChecked(bool(self.config['chat_id']))
         chat_id_layout.addWidget(self.save_chat_id_cb)
         layout.addLayout(chat_id_layout)
@@ -125,7 +166,7 @@ class TelegramScraperUI(QMainWindow):
         phone_layout.addWidget(QLabel("Số điện thoại:"))
         self.phone_input = QLineEdit(self.config['phone_number'])
         phone_layout.addWidget(self.phone_input)
-        self.save_phone_cb = QCheckBox("Save")
+        self.save_phone_cb = QCheckBox("Lưu")
         self.save_phone_cb.setChecked(bool(self.config['phone_number']))
         phone_layout.addWidget(self.save_phone_cb)
         layout.addLayout(phone_layout)
@@ -139,24 +180,32 @@ class TelegramScraperUI(QMainWindow):
 
         group_link_layout = QHBoxLayout()
         group_link_layout.addWidget(QLabel("Link group:"))
-        self.group_link_input = QLineEdit(self.config['group_link'])
+
+        self.group_link_input = ComboBoxWithHistory()
+
+        self.group_link_input.setMinimumWidth(450)
+
+        if self.config['group_link_history']:
+            self.group_link_input.set_history(self.config['group_link_history'])
+            self.group_link_input.setCurrentText("")
+
+        if self.config['group_link'] and self.group_link_input.findText(self.config['group_link']) == -1:
+            self.group_link_input.add_to_history(self.config['group_link'])
+
         group_link_layout.addWidget(self.group_link_input)
-        self.save_group_link_cb = QCheckBox("Save")
-        self.save_group_link_cb.setChecked(bool(self.config['group_link']))
-        group_link_layout.addWidget(self.save_group_link_cb)
         layout.addLayout(group_link_layout)
 
         limits_layout = QHBoxLayout()
 
         limits_layout.addWidget(QLabel("Giới hạn tin nhắn:"))
         self.messages_limit_input = QSpinBox()
-        self.messages_limit_input.setRange(1, 10000)
+        self.messages_limit_input.setRange(1, 999999)
         self.messages_limit_input.setValue(self.config['messages_limit'])
         limits_layout.addWidget(self.messages_limit_input)
 
         limits_layout.addWidget(QLabel("Giới hạn thành viên:"))
         self.member_limit_input = QSpinBox()
-        self.member_limit_input.setRange(1, 10000)
+        self.member_limit_input.setRange(1, 999999)
         self.member_limit_input.setValue(self.config['member_limit'])
         limits_layout.addWidget(self.member_limit_input)
 
@@ -197,8 +246,39 @@ class TelegramScraperUI(QMainWindow):
         group_box.setLayout(layout)
         parent_layout.addWidget(group_box)
 
+    def create_auth_controls_group(self, parent_layout):
+        group_box = QGroupBox("Xác thực Telegram")
+        layout = QVBoxLayout()
+
+        auth_phone_layout = QHBoxLayout()
+        auth_phone_layout.addWidget(QLabel("Nhập số điện thoại:"))
+        self.auth_phone_input = QLineEdit()
+        self.auth_phone_input.setPlaceholderText("+84xxxxxxxxxx - có mã quốc gia")
+        self.auth_phone_input.setEnabled(False)
+        auth_phone_layout.addWidget(self.auth_phone_input)
+        self.submit_phone_btn = QPushButton("Gửi")
+        self.submit_phone_btn.clicked.connect(self.submit_phone)
+        self.submit_phone_btn.setEnabled(False)
+        auth_phone_layout.addWidget(self.submit_phone_btn)
+        layout.addLayout(auth_phone_layout)
+
+        auth_code_layout = QHBoxLayout()
+        auth_code_layout.addWidget(QLabel("Mã xác thực:"))
+        self.auth_code_input = QLineEdit()
+        self.auth_code_input.setPlaceholderText("Nhập mã xác thực được gửi về Telegram")
+        self.auth_code_input.setEnabled(False)
+        auth_code_layout.addWidget(self.auth_code_input)
+        self.submit_code_btn = QPushButton("Gửi")
+        self.submit_code_btn.clicked.connect(self.submit_code)
+        self.submit_code_btn.setEnabled(False)
+        auth_code_layout.addWidget(self.submit_code_btn)
+        layout.addLayout(auth_code_layout)
+
+        group_box.setLayout(layout)
+        parent_layout.addWidget(group_box)
+
     def create_console_group(self, parent_layout):
-        group_box = QGroupBox()
+        group_box = QGroupBox("Tiến trình")
         layout = QVBoxLayout()
 
         self.console_output = QPlainTextEdit()
@@ -238,8 +318,13 @@ class TelegramScraperUI(QMainWindow):
         if self.save_phone_cb.isChecked():
             config_to_save['phone_number'] = self.phone_input.text()
 
-        if self.save_group_link_cb.isChecked():
-            config_to_save['group_link'] = self.group_link_input.text()
+        current_group_link = self.group_link_input.currentText()
+        config_to_save['group_link'] = current_group_link
+
+        if current_group_link:
+            self.group_link_input.add_to_history(current_group_link)
+
+        config_to_save['group_link_history'] = self.group_link_input.get_history()
 
         config_to_save['messages_limit'] = self.messages_limit_input.value()
         config_to_save['member_limit'] = self.member_limit_input.value()
@@ -263,7 +348,7 @@ class TelegramScraperUI(QMainWindow):
             'api_id': self.api_id_input.text(),
             'chat_id': self.chat_id_input.text(),
             'phone_number': self.phone_input.text(),
-            'group_link': self.group_link_input.text(),
+            'group_link': self.group_link_input.currentText(),
             'messages_limit': self.messages_limit_input.value(),
             'member_limit': self.member_limit_input.value(),
             'day_target': self.day_target_combo.currentIndex(),
@@ -280,7 +365,7 @@ class TelegramScraperUI(QMainWindow):
             'API Hash': self.api_hash_input.text(),
             'API ID': self.api_id_input.text(),
             'Chat ID': self.chat_id_input.text(),
-            'Group Link': self.group_link_input.text()
+            'Group Link': self.group_link_input.currentText()
         }
 
         missing_fields = []
@@ -310,37 +395,130 @@ class TelegramScraperUI(QMainWindow):
         return True
 
     @pyqtSlot(str)
-    def append_to_console(self, text):
+    def handle_stdout(self, text):
         self.console_output.appendPlainText(text.rstrip())
 
-    def handle_auth_data(self, phone, code):
-        import start
+        if "Vui lòng nhập số điện thoại để đăng nhập" in text:
+            self.waiting_for_phone = True
+            self.auth_phone_input.setEnabled(True)
+            self.submit_phone_btn.setEnabled(True)
+            self.auth_code_input.setEnabled(False)
+            self.submit_code_btn.setEnabled(False)
+            self.auth_phone_input.setFocus()
 
-        if code:
-            start.auth_code = code
-            start.auth_code_ready.set()
-        else:
-            start.auth_phone = phone
-            start.auth_ready.set()
+        elif "Vui lòng nhập mã xác thực được gửi về Telegram" in text:
+            self.waiting_for_code = True
+            self.auth_phone_input.setEnabled(False)
+            self.submit_phone_btn.setEnabled(False)
+            self.auth_code_input.setEnabled(True)
+            self.submit_code_btn.setEnabled(True)
+            self.auth_code_input.setFocus()
+
+        elif "Đã xác thực thành công" in text:
+            self.auth_phone_input.setEnabled(False)
+            self.submit_phone_btn.setEnabled(False)
+            self.auth_code_input.setEnabled(False)
+            self.submit_code_btn.setEnabled(False)
+
+    def submit_phone(self):
+        phone = self.auth_phone_input.text().strip()
+        if not phone:
+            self.console_output.appendPlainText("Lỗi: Vui lòng nhập số điện thoại")
+            return
+
+        if not phone.startswith("+"):
+            self.console_output.appendPlainText("Warning: Số điện thoại phải bắt đầu bằng dấu + và mã quốc gia (VN: +84)")
+
+        self.auth_phone_input.setEnabled(False)
+        self.submit_phone_btn.setEnabled(False)
+        self.waiting_for_phone = False
+
+        import start
+        start.auth_phone = phone
+        start.auth_ready.set()
+
+        self.console_output.appendPlainText(f"Đã gửi số điện thoại: {phone}")
+
+    def submit_code(self):
+        code = self.auth_code_input.text().strip()
+        if not code:
+            self.console_output.appendPlainText("Lỗi: Vui lòng nhập mã xác thực")
+            return
+
+        self.auth_code_input.setEnabled(False)
+        self.submit_code_btn.setEnabled(False)
+        self.waiting_for_code = False
+
+        import start
+        start.auth_code = code
+        start.auth_code_ready.set()
+
+        self.console_output.appendPlainText("Đã gửi mã xác thực")
 
     @pyqtSlot(bool)
     def handle_worker_finished(self, success):
         if success:
             QMessageBox.information(self, "Hoàn thành", "Quá trình lọc đã hoàn thành!")
+
+            current_link = self.group_link_input.currentText()
+            if current_link:
+                self.group_link_input.add_to_history(current_link)
+                self.save_config()
         else:
             QMessageBox.warning(self, "Lỗi", "Có lỗi xảy ra trong quá trình lọc!")
 
-        if self.auth_dialog and self.auth_dialog.isVisible():
-            self.auth_dialog.close()
+        self.auth_phone_input.setEnabled(False)
+        self.submit_phone_btn.setEnabled(False)
+        self.auth_code_input.setEnabled(False)
+        self.submit_code_btn.setEnabled(False)
+        self.auth_phone_input.clear()
+        self.auth_code_input.clear()
 
-            sys.stdout = sys.__stdout__
+        self.waiting_for_phone = False
+        self.waiting_for_code = False
+
+        self.is_scraping = False
+        self.toggle_ui_elements(True)
+
+    def toggle_ui_elements(self, enabled):
+        self.run_button.setEnabled(enabled)
+        self.save_button.setEnabled(enabled)
+
+        self.bot_token_input.setEnabled(enabled)
+        self.api_hash_input.setEnabled(enabled)
+        self.api_id_input.setEnabled(enabled)
+        self.chat_id_input.setEnabled(enabled)
+        self.phone_input.setEnabled(enabled)
+        self.group_link_input.setEnabled(enabled)
+        self.messages_limit_input.setEnabled(enabled)
+        self.member_limit_input.setEnabled(enabled)
+        self.day_target_combo.setEnabled(enabled)
+        self.locmess_cb.setEnabled(enabled)
+        self.locmember_cb.setEnabled(enabled)
+        self.locavatar_cb.setEnabled(enabled)
+        self.locphonenum_cb.setEnabled(enabled)
+
+        self.save_bot_token_cb.setEnabled(enabled)
+        self.save_api_hash_cb.setEnabled(enabled)
+        self.save_api_id_cb.setEnabled(enabled)
+        self.save_chat_id_cb.setEnabled(enabled)
+        self.save_phone_cb.setEnabled(enabled)
 
     def run_scraper(self):
+        if self.is_scraping:
+            QMessageBox.warning(self, "Đang xử lý", "Quá trình lọc đang chạy. Vui lòng đợi cho đến khi hoàn thành.")
+            return
+
         if not self.validate_inputs():
             return
 
-        current_config = self.get_current_config()
+        self.is_scraping = True
 
+        self.toggle_ui_elements(False)
+
+        self.console_output.appendPlainText("Đang bắt đầu quá trình lọc...")
+
+        current_config = self.get_current_config()
         self.create_temp_config_file(current_config)
 
         import start
@@ -348,10 +526,6 @@ class TelegramScraperUI(QMainWindow):
         start.auth_code = None
         start.auth_ready.clear()
         start.auth_code_ready.clear()
-
-        self.auth_dialog = AuthDialog(self)
-        self.auth_dialog.auth_data.connect(self.handle_auth_data)
-        self.auth_dialog.show()
 
         self.worker_thread = TelegramWorker()
         self.worker_thread.finished.connect(self.handle_worker_finished)
@@ -363,7 +537,7 @@ class TelegramScraperUI(QMainWindow):
             f.write(f"api_hash = '{config['api_hash']}'\n")
             f.write(f"api_id = '{config['api_id']}'\n\n")
             f.write(f"chat_id = '{config['chat_id']}'\n\n")
-            f.write(f"group_link = '{config['group_link']}'\n")
+            f.write(f"group_link = ''\n")
             f.write(f"phone_number = '{config['phone_number']}'\n")
             f.write(f"messages_limit = {config['messages_limit']}\n")
             f.write(f"member_limit = {config['member_limit']}\n")
