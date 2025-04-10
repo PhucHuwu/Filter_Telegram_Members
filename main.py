@@ -166,14 +166,14 @@ class TelegramScraperUI(QMainWindow):
         chat_id_layout.addWidget(self.save_chat_id_cb)
         layout.addLayout(chat_id_layout)
 
-        phone_layout = QHBoxLayout()
-        phone_layout.addWidget(QLabel("Số điện thoại:"))
-        self.phone_input = QLineEdit(self.config['phone_number'])
-        phone_layout.addWidget(self.phone_input)
-        self.save_phone_cb = QCheckBox("Lưu")
-        self.save_phone_cb.setChecked(True)
-        phone_layout.addWidget(self.save_phone_cb)
-        layout.addLayout(phone_layout)
+        # phone_layout = QHBoxLayout()
+        # phone_layout.addWidget(QLabel("Số điện thoại:"))
+        # self.phone_input = QLineEdit(self.config['phone_number'])
+        # phone_layout.addWidget(self.phone_input)
+        # self.save_phone_cb = QCheckBox("Lưu")
+        # self.save_phone_cb.setChecked(True)
+        # phone_layout.addWidget(self.save_phone_cb)
+        # layout.addLayout(phone_layout)
 
         group_box.setLayout(layout)
         parent_layout.addWidget(group_box)
@@ -183,7 +183,7 @@ class TelegramScraperUI(QMainWindow):
         layout = QVBoxLayout()
 
         group_link_layout = QHBoxLayout()
-        group_link_layout.addWidget(QLabel("Link group:"))
+        group_link_layout.addWidget(QLabel("Link nhóm:"))
 
         self.group_link_input = ComboBoxWithHistory()
 
@@ -319,8 +319,8 @@ class TelegramScraperUI(QMainWindow):
         if self.save_chat_id_cb.isChecked():
             config_to_save['chat_id'] = self.chat_id_input.text()
 
-        if self.save_phone_cb.isChecked():
-            config_to_save['phone_number'] = self.phone_input.text()
+        # if self.save_phone_cb.isChecked():
+        #     config_to_save['phone_number'] = self.phone_input.text()
 
         current_group_link = self.group_link_input.currentText()
         config_to_save['group_link'] = current_group_link
@@ -351,7 +351,7 @@ class TelegramScraperUI(QMainWindow):
             'api_hash': self.api_hash_input.text(),
             'api_id': self.api_id_input.text(),
             'chat_id': self.chat_id_input.text(),
-            'phone_number': self.phone_input.text(),
+            # 'phone_number': self.phone_input.text(),
             'group_link': self.group_link_input.currentText(),
             'messages_limit': self.messages_limit_input.value(),
             'member_limit': self.member_limit_input.value(),
@@ -369,7 +369,7 @@ class TelegramScraperUI(QMainWindow):
             'API Hash': self.api_hash_input.text(),
             'API ID': self.api_id_input.text(),
             'Chat ID': self.chat_id_input.text(),
-            'Group Link': self.group_link_input.currentText()
+            'Link nhóm': self.group_link_input.currentText()
         }
 
         missing_fields = []
@@ -441,8 +441,6 @@ class TelegramScraperUI(QMainWindow):
         start.auth_phone = phone
         start.auth_ready.set()
 
-        self.console_output.appendPlainText(f"Đã gửi số điện thoại: {phone}")
-
     def submit_code(self):
         code = self.auth_code_input.text().strip()
         if not code:
@@ -492,7 +490,7 @@ class TelegramScraperUI(QMainWindow):
         self.api_hash_input.setEnabled(enabled)
         self.api_id_input.setEnabled(enabled)
         self.chat_id_input.setEnabled(enabled)
-        self.phone_input.setEnabled(enabled)
+        # self.phone_input.setEnabled(enabled)
         self.group_link_input.setEnabled(enabled)
         self.messages_limit_input.setEnabled(enabled)
         self.member_limit_input.setEnabled(enabled)
@@ -506,7 +504,7 @@ class TelegramScraperUI(QMainWindow):
         self.save_api_hash_cb.setEnabled(enabled)
         self.save_api_id_cb.setEnabled(enabled)
         self.save_chat_id_cb.setEnabled(enabled)
-        self.save_phone_cb.setEnabled(enabled)
+        # self.save_phone_cb.setEnabled(enabled)
 
     def run_scraper(self):
         if self.is_scraping:
