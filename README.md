@@ -1,4 +1,4 @@
-﻿# Telegram User Tracker
+﻿# Filter Telegram Members
 
 ## Giới thiệu
 Đây là một chương trình Python sử dụng thư viện Telethon để thu thập thông tin về người dùng trong một nhóm Telegram. Chương trình này sẽ theo dõi người dùng hoạt động trong khoảng thời gian được chỉ định và xuất thông tin của họ ra tệp CSV, đồng thời gửi danh sách người dùng đến một chat Telegram thông qua bot.
@@ -19,9 +19,6 @@
 ```bash
 pip install telethon python-telegram-bot pandas
 ```
-
-## Cấu hình
-Trước khi chạy chương trình, bạn cần cập nhật file `config.py` với các thông tin sau cá nhân
 
 ## Cách sử dụng
 **Vui lòng liên hệ trong thông tin liên hệ**
