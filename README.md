@@ -1,7 +1,7 @@
 ﻿# Filter Telegram Members
 
 ## Giới thiệu
-Đây là một chương trình Python sử dụng thư viện Telethon để thu thập thông tin về người dùng trong một nhóm Telegram. Chương trình này sẽ theo dõi người dùng hoạt động trong khoảng thời gian được chỉ định và xuất thông tin của họ ra tệp CSV, đồng thời gửi danh sách người dùng đến một chat Telegram thông qua bot.
+Đây là một chương trình Python thu thập thông tin về người dùng trong một nhóm Telegram. Chương trình này sẽ theo dõi người dùng hoạt động trong khoảng thời gian được chỉ định và xuất thông tin của họ ra tệp CSV, đồng thời gửi danh sách người dùng đến một chat Telegram thông qua bot.
 
 ## Tính năng
 - Thu thập thông tin người dùng từ nhóm Telegram (tên, tên người dùng, trạng thái hoạt động)
