@@ -48,9 +48,13 @@ class ComboBoxWithHistory(QComboBox):
 class TelegramWorker(QThread):
     finished = pyqtSignal(bool)
 
+    def __init__(self, config_dict):
+        super().__init__()
+        self.config_dict = config_dict
+
     def run(self):
         from start import run_telegram_client
-        success = run_telegram_client()
+        success = run_telegram_client(self.config_dict)
         self.finished.emit(success)
 
 
@@ -131,7 +135,7 @@ class TelegramScraperUI(QMainWindow):
         self.bot_token_input = QLineEdit(self.config['bot_token'])
         bot_layout.addWidget(self.bot_token_input)
         self.save_bot_token_cb = QCheckBox("Lưu")
-        self.save_bot_token_cb.setChecked(bool(self.config['bot_token']))
+        self.save_bot_token_cb.setChecked(True)
         bot_layout.addWidget(self.save_bot_token_cb)
         layout.addLayout(bot_layout)
 
@@ -140,7 +144,7 @@ class TelegramScraperUI(QMainWindow):
         self.api_hash_input = QLineEdit(self.config['api_hash'])
         api_hash_layout.addWidget(self.api_hash_input)
         self.save_api_hash_cb = QCheckBox("Lưu")
-        self.save_api_hash_cb.setChecked(bool(self.config['api_hash']))
+        self.save_api_hash_cb.setChecked(True)
         api_hash_layout.addWidget(self.save_api_hash_cb)
         layout.addLayout(api_hash_layout)
 
@@ -149,7 +153,7 @@ class TelegramScraperUI(QMainWindow):
         self.api_id_input = QLineEdit(self.config['api_id'])
         api_id_layout.addWidget(self.api_id_input)
         self.save_api_id_cb = QCheckBox("Lưu")
-        self.save_api_id_cb.setChecked(bool(self.config['api_id']))
+        self.save_api_id_cb.setChecked(True)
         api_id_layout.addWidget(self.save_api_id_cb)
         layout.addLayout(api_id_layout)
 
@@ -158,7 +162,7 @@ class TelegramScraperUI(QMainWindow):
         self.chat_id_input = QLineEdit(self.config['chat_id'])
         chat_id_layout.addWidget(self.chat_id_input)
         self.save_chat_id_cb = QCheckBox("Lưu")
-        self.save_chat_id_cb.setChecked(bool(self.config['chat_id']))
+        self.save_chat_id_cb.setChecked(True)
         chat_id_layout.addWidget(self.save_chat_id_cb)
         layout.addLayout(chat_id_layout)
 
@@ -167,7 +171,7 @@ class TelegramScraperUI(QMainWindow):
         self.phone_input = QLineEdit(self.config['phone_number'])
         phone_layout.addWidget(self.phone_input)
         self.save_phone_cb = QCheckBox("Lưu")
-        self.save_phone_cb.setChecked(bool(self.config['phone_number']))
+        self.save_phone_cb.setChecked(True)
         phone_layout.addWidget(self.save_phone_cb)
         layout.addLayout(phone_layout)
 
@@ -463,7 +467,7 @@ class TelegramScraperUI(QMainWindow):
             current_link = self.group_link_input.currentText()
             if current_link:
                 self.group_link_input.add_to_history(current_link)
-                self.save_config()
+            self.save_config()
         else:
             QMessageBox.warning(self, "Lỗi", "Có lỗi xảy ra trong quá trình lọc!")
 
@@ -519,7 +523,6 @@ class TelegramScraperUI(QMainWindow):
         self.console_output.appendPlainText("Đang bắt đầu quá trình lọc...")
 
         current_config = self.get_current_config()
-        self.create_temp_config_file(current_config)
 
         import start
         start.auth_phone = None
@@ -527,25 +530,9 @@ class TelegramScraperUI(QMainWindow):
         start.auth_ready.clear()
         start.auth_code_ready.clear()
 
-        self.worker_thread = TelegramWorker()
+        self.worker_thread = TelegramWorker(current_config)
         self.worker_thread.finished.connect(self.handle_worker_finished)
         self.worker_thread.start()
-
-    def create_temp_config_file(self, config):
-        with open('config.py', 'w', encoding='utf-8') as f:
-            f.write(f"bot_token = '{config['bot_token']}'\n\n")
-            f.write(f"api_hash = '{config['api_hash']}'\n")
-            f.write(f"api_id = '{config['api_id']}'\n\n")
-            f.write(f"chat_id = '{config['chat_id']}'\n\n")
-            f.write(f"group_link = ''\n")
-            f.write(f"phone_number = '{config['phone_number']}'\n")
-            f.write(f"messages_limit = {config['messages_limit']}\n")
-            f.write(f"member_limit = {config['member_limit']}\n")
-            f.write(f"day_target = {config['day_target']}\n\n")
-            f.write(f"locmess = '{config['locmess']}'\n")
-            f.write(f"locmember = '{config['locmember']}'\n")
-            f.write(f"locavatar = '{config['locavatar']}'\n")
-            f.write(f"locphonenum = '{config['locphonenum']}'")
 
 
 if __name__ == "__main__":

@@ -9,11 +9,7 @@ import re
 import asyncio
 import threading
 
-from config import (
-    bot_token, chat_id, api_hash, api_id, phone_number,
-    day_target, group_link, member_limit, messages_limit,
-    locmess, locmember, locavatar, locphonenum
-)
+
 from filter_members import filter_active_members
 from filter_messages import filter_active_from_messages
 
@@ -25,8 +21,22 @@ auth_code_ready = threading.Event()
 client = None
 
 
-async def main():
+async def main(config_dict):
     global client, auth_phone, auth_code
+
+    bot_token = config_dict.get('bot_token', '')
+    chat_id = config_dict.get('chat_id', '')
+    api_hash = config_dict.get('api_hash', '')
+    api_id = config_dict.get('api_id', '')
+    phone_number = config_dict.get('phone_number', '')
+    group_link = config_dict.get('group_link', '')
+    messages_limit = int(config_dict.get('messages_limit', 1000))
+    member_limit = int(config_dict.get('member_limit', 1000))
+    day_target = int(config_dict.get('day_target', 0))
+    locmess = config_dict.get('locmess', 'y')
+    locmember = config_dict.get('locmember', 'y')
+    locavatar = config_dict.get('locavatar', 'n')
+    locphonenum = config_dict.get('locphonenum', 'n')
 
     client = TelegramClient('session_name', api_id, api_hash)
 
@@ -166,11 +176,11 @@ async def main():
     return True
 
 
-def run_telegram_client():
+def run_telegram_client(config_dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        success = loop.run_until_complete(main())
+        success = loop.run_until_complete(main(config_dict))
         return success
     except Exception as e:
         print(f"Error running Telegram client: {e}")
