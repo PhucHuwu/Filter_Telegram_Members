@@ -25,10 +25,10 @@ pip install telethon python-telegram-bot pandas
 
 ## Kết quả
 - Chương trình sẽ tạo một file CSV với tên là tên của nhóm Telegram
-- File CSV chứa thông tin về ID (tên người dùng), tên, trạng thái hoạt động của thành viên trong nhóm
+- File CSV chứa thông tin về tên người dùng (username), tên, trạng thái hoạt động của thành viên trong nhóm
 - Danh sách người dùng hoạt động gần đây sẽ được gửi đến chat thông qua bot Telegram
 
 ## Lưu ý
 - Chương trình sẽ chỉ thu thập thông tin của người dùng có tên người dùng (username)
-- Đảm bảo tài khoản của bạn có quyền xem thành viên trong nhóm
+- Đảm bảo tài khoản của bạn có quyền xem thành viên, tin nhắn trong nhóm
 - Quá trình thu thập dữ liệu có thể mất thời gian tùy thuộc vào kích thước của nhóm và giới hạn cấu hình
